@@ -38,7 +38,7 @@ const WORD_LISTS = [
 
 const WORD_DURATION_MS = 500;
 const POST_BLOCK_COUNTDOWN_SECONDS = 5;
-const DISTRACTOR_SECONDS = 30;
+const DISTRACTOR_SECONDS = 5;
 const DISTRACTOR_STEP = 3;
 
 const state = {
@@ -109,7 +109,7 @@ function showWelcome() {
       <ol>
         <li>You will complete three word-learning blocks. The order of the three encoding strategies is randomized.</li>
         <li>Each block contains six words, shown one at a time.</li>
-        <li>After all three blocks, you will count backward for 30 seconds.</li>
+        <li>After all three blocks, you will count backward for 5 seconds.</li>
         <li>Finally, you will freely recall as many of the 18 words as possible.</li>
       </ol>
     </div>
@@ -204,7 +204,7 @@ function showDistractorIntro() {
       Type each next number and press Enter. For example, if you started at 938,
       you would enter 935, then 932, then 929, and so on.
     </p>
-    <button id="startDistractorBtn">Start 30-second task</button>
+    <button id="startDistractorBtn">Start 5-second task</button>
   `;
 
   document.getElementById("startDistractorBtn").addEventListener("click", runDistractor);
@@ -279,7 +279,8 @@ function showRecall() {
   document.getElementById("scoreBtn").addEventListener("click", () => {
     state.recallRaw = recallText.value;
     scoreRecall();
-    showResults();
+    showAutoSaveScreen();
+    saveDataAndContinue();
   });
 }
 
@@ -325,58 +326,34 @@ function getStrategyScore(strategy) {
     .reduce((sum, row) => sum + row.recalled, 0);
 }
 
-function showResults() {
+function showAutoSaveScreen() {
   const maintenance = getStrategyScore("maintenance");
   const selfRef = getStrategyScore("self_reference");
   const imagery = getStrategyScore("imagery");
   const total = maintenance + selfRef + imagery;
 
   app.innerHTML = `
-    <h2>Results</h2>
-    <p class="muted">Session ID: <code>${state.sessionId}</code></p>
-
+    <h2>Saving your results</h2>
+    <p>Please keep this page open. Your responses are being saved automatically.</p>
     <div class="stats-grid">
-      <div class="stat">
-        <span class="value">${maintenance}/6</span>
-        Maintenance rehearsal
-      </div>
-      <div class="stat">
-        <span class="value">${selfRef}/6</span>
-        Self-reference
-      </div>
-      <div class="stat">
-        <span class="value">${imagery}/6</span>
-        Mental imagery
-      </div>
-      <div class="stat">
-        <span class="value">${total}/18</span>
-        Total recalled
-      </div>
+      <div class="stat"><span class="value">${maintenance}/6</span>Maintenance rehearsal</div>
+      <div class="stat"><span class="value">${selfRef}/6</span>Self-reference</div>
+      <div class="stat"><span class="value">${imagery}/6</span>Mental imagery</div>
+      <div class="stat"><span class="value">${total}/18</span>Total recalled</div>
     </div>
-
-    <div class="result-box">
-      <strong>Randomized strategy order:</strong>
-      ${state.strategyOrder.map((s) => STRATEGIES[s].label).join(" → ")}
-      <br />
-      <strong>Distractor entries recorded:</strong> ${state.distractorEntries.length}
-      <br />
-      <strong>Intrusions:</strong> ${state.intrusions.length ? escapeHtml(state.intrusions.join(", ")) : "None"}
-    </div>
-
     <div class="notice" id="saveStatus">
-      <strong>Next step:</strong> save both CSV files to DataPipe. The page will redirect only after both files have been accepted by DataPipe.
+      <strong>Saving...</strong> Both data files must be accepted before you continue to the final survey.
     </div>
-
-    <button id="saveContinueBtn">Save data and continue</button>
-    <button class="secondary" id="downloadSummaryBtn">Download summary CSV</button>
-    <button class="secondary" id="downloadTrialsBtn">Download trial-level CSV</button>
-    <button class="secondary" id="restartBtn">Run a new session</button>
+    <div id="backupControls" hidden>
+      <p class="muted small">If automatic saving fails, download both files as a backup or try saving again.</p>
+      <button id="retrySaveBtn">Try saving again</button>
+      <button class="secondary" id="downloadSummaryBtn">Download summary CSV</button>
+      <button class="secondary" id="downloadTrialsBtn">Download trial-level CSV</button>
+    </div>
   `;
-
-  document.getElementById("saveContinueBtn").addEventListener("click", saveDataAndContinue);
+  document.getElementById("retrySaveBtn").addEventListener("click", saveDataAndContinue);
   document.getElementById("downloadSummaryBtn").addEventListener("click", downloadSummaryCsv);
   document.getElementById("downloadTrialsBtn").addEventListener("click", downloadTrialCsv);
-  document.getElementById("restartBtn").addEventListener("click", () => window.location.reload());
 }
 
 function csvEscape(value) {
@@ -494,9 +471,11 @@ async function sendTextFileToDataPipe(filename, dataString) {
 }
 
 async function saveDataAndContinue() {
-  const button = document.getElementById("saveContinueBtn");
   const statusBox = document.getElementById("saveStatus");
-  button.disabled = true;
+  const backupControls = document.getElementById("backupControls");
+  const retryButton = document.getElementById("retrySaveBtn");
+  if (retryButton) retryButton.disabled = true;
+  if (backupControls) backupControls.hidden = true;
   statusBox.innerHTML = "<strong>Saving...</strong> Please keep this page open until both data files have been accepted.";
 
   const summaryFilename = `encoding_summary_${state.sessionId}.csv`;
@@ -507,38 +486,24 @@ async function saveDataAndContinue() {
       await sendTextFileToDataPipe(summaryFilename, rowsToCsv(getSummaryRows()));
       state.uploadStatus.summary = true;
     }
-
     if (!state.uploadStatus.trials) {
       await sendTextFileToDataPipe(trialFilename, rowsToCsv(getTrialRows()));
       state.uploadStatus.trials = true;
     }
 
-    statusBox.innerHTML = "<strong class=\"good\">Saved.</strong> Both data files were accepted. Continuing...";
-
+    statusBox.innerHTML = "<strong class=\"good\">Saved.</strong> Both data files were accepted. Opening the final survey...";
     const destination = PROJECT_CONFIG.REDIRECT_URL.trim();
-    if (!destination || destination.includes("PASTE_")) {
-      statusBox.innerHTML = "<strong class=\"good\">Saved.</strong> Both data files were accepted. No redirect URL is configured, so this practice run ends here.";
-      button.textContent = "Data saved";
-      return;
-    }
+    if (!destination || destination.includes("PASTE_")) throw new Error("Redirect URL has not been configured in config.js.");
 
     const nextUrl = new URL(destination, window.location.href);
-    if (PROJECT_CONFIG.PASS_SESSION_ID) {
-      nextUrl.searchParams.set("sid", state.sessionId);
-    }
+    if (PROJECT_CONFIG.PASS_SESSION_ID) nextUrl.searchParams.set("sid", state.sessionId);
 
-    window.setTimeout(() => {
-      window.location.assign(nextUrl.toString());
-    }, 600);
+    window.setTimeout(() => window.location.assign(nextUrl.toString()), 600);
   } catch (error) {
     console.error(error);
-    statusBox.innerHTML = `
-      <strong class="warn">The data were not fully saved.</strong><br />
-      ${escapeHtml(error.message)}<br />
-      Keep this page open and try again. You can also use the local CSV download buttons as a backup.
-    `;
-    button.disabled = false;
-    button.textContent = "Try saving again";
+    statusBox.innerHTML = `<strong class="warn">The data were not fully saved.</strong><br />${escapeHtml(error.message)}<br />Keep this page open and try again. Backup download buttons are available below.`;
+    if (backupControls) backupControls.hidden = false;
+    if (retryButton) retryButton.disabled = false;
   }
 }
 

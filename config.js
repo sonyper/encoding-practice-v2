@@ -11,6 +11,6 @@
 
 const PROJECT_CONFIG = {
   DATAPIPE_EXPERIMENT_ID: "aYIi0R1f7DaH",
-  REDIRECT_URL: "PASTE_NEXT_PROJECT_OR_QUALTRICS_URL_HERE",
-  PASS_SESSION_ID: true
+  REDIRECT_URL: "https://stlawu.qualtrics.com/jfe/form/SV_dhuzwAkMKUaZetM",
+  PASS_SESSION_ID: false
 };

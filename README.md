@@ -12,7 +12,7 @@ Participants complete three encoding blocks:
 
 Each block contains six words. The order of the three encoding conditions is randomized across sessions. To reduce word-list confounding, the three six-word lists are also randomly assigned to the three encoding strategies.
 
-After all three blocks, participants complete a 30-second backward-counting distractor task and then freely recall as many of the 18 words as possible.
+After all three blocks, participants complete a 5-second backward-counting distractor task and then freely recall as many of the 18 words as possible.
 
 The app automatically scores recall by encoding strategy.
 
@@ -48,11 +48,11 @@ See the separate handout: `GitHub_Pages_Practice_Handout.docx`.
 
 This folder now includes `config.js`. Paste your DataPipe experiment ID and the URL of the next GitHub project or Qualtrics survey into that file.
 
-When the participant clicks **Save data and continue**, the app sends two uniquely named CSV files to DataPipe:
+When the participant finishes free recall, the app automatically sends two uniquely named CSV files to DataPipe:
 
 - `encoding_summary_<sessionID>.csv` — one row per participant/session
 - `encoding_trials_<sessionID>.csv` — 18 rows, one per studied word
 
-The app waits until DataPipe returns an accepted status for both files before redirecting. If an upload is rejected or the network request fails, the participant remains on the page and can retry or download the CSV files locally.
+The app waits until DataPipe returns an accepted status for both files before automatically redirecting to the configured Qualtrics survey. If an upload is rejected or the network request fails, the participant remains on the page and can retry or download the CSV files locally.
 
 If `PASS_SESSION_ID` is true, the redirect URL receives the anonymous session ID as a query parameter named `sid`. Example: `https://nextsite.example/?sid=ABCD1234`.
