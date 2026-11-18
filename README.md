@@ -63,3 +63,10 @@ If `PASS_SESSION_ID` is true, the redirect URL receives the anonymous session ID
 The results screen now displays the participant's recall score for each encoding strategy together with a concise explanation of the typical group-level pattern: elaborative encoding through self-reference or mental imagery generally produces better later recall than maintenance rehearsal, while the relative ordering of self-reference and imagery can vary. The explanation also cautions participants not to overinterpret a single six-word-per-condition result.
 
 The DataPipe upload behavior is unchanged. After both files are accepted, the results/explanation screen remains visible for 25 seconds and then automatically redirects using the existing configuration.
+
+
+## Results review and recall scoring
+
+After DataPipe accepts both data files, the participant sees their recall scores together with an explanation of the typical encoding-strategy pattern. A 30-second countdown is displayed before redirecting to the configured destination. The countdown can be paused and resumed.
+
+Recall scoring is case-insensitive and allows minor misspellings. A typed response counts as a studied word when normalized Levenshtein similarity is at least 0.75. Each recalled token can receive credit for at most one studied word. The trial-level CSV includes `recalled_as` and `match_similarity` fields so fuzzy matches can be reviewed.

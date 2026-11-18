@@ -40,7 +40,8 @@ const WORD_DURATION_MS = 500;
 const POST_BLOCK_COUNTDOWN_SECONDS = 5;
 const DISTRACTOR_SECONDS = 5;
 const DISTRACTOR_STEP = 3;
-const RESULTS_REVIEW_MS = 25000;
+const RESULTS_REVIEW_SECONDS = 30;
+const RECALL_MATCH_THRESHOLD = 0.75;
 
 const state = {
   sessionId: makeSessionId(),
@@ -294,17 +295,51 @@ function normalizeRecall(text) {
     .filter(Boolean);
 }
 
+function levenshteinDistance(a, b) {
+  const left = a.toLowerCase();
+  const right = b.toLowerCase();
+
+  const previous = Array.from({ length: right.length + 1 }, (_, i) => i);
+  const current = new Array(right.length + 1);
+
+  for (let i = 1; i <= left.length; i++) {
+    current[0] = i;
+
+    for (let j = 1; j <= right.length; j++) {
+      const substitutionCost = left[i - 1] === right[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + substitutionCost
+      );
+    }
+
+    for (let j = 0; j <= right.length; j++) {
+      previous[j] = current[j];
+    }
+  }
+
+  return previous[right.length];
+}
+
+function wordSimilarity(a, b) {
+  const left = String(a).toLowerCase();
+  const right = String(b).toLowerCase();
+  const maxLength = Math.max(left.length, right.length);
+
+  if (maxLength === 0) return 1;
+
+  return 1 - levenshteinDistance(left, right) / maxLength;
+}
+
 function scoreRecall() {
   const tokens = normalizeRecall(state.recallRaw);
   state.recallTokens = [...new Set(tokens)];
 
-  const allTargets = new Set();
-  state.scoredWords = [];
-
+  const targets = [];
   state.blocks.forEach((block) => {
     block.words.forEach((word, wordIndex) => {
-      allTargets.add(word);
-      state.scoredWords.push({
+      targets.push({
         session_id: state.sessionId,
         block_position: block.blockPosition,
         strategy: block.strategy,
@@ -312,12 +347,43 @@ function scoreRecall() {
         list_id: block.listId,
         word_serial_position: wordIndex + 1,
         word,
-        recalled: state.recallTokens.includes(word) ? 1 : 0
+        recalled: 0,
+        recalled_as: "",
+        match_similarity: ""
       });
     });
   });
 
-  state.intrusions = state.recallTokens.filter((token) => !allTargets.has(token));
+  // Build all acceptable token-target matches, then assign the strongest matches
+  // first so that one recalled token cannot receive credit for more than one word.
+  const candidates = [];
+  state.recallTokens.forEach((token, tokenIndex) => {
+    targets.forEach((target, targetIndex) => {
+      const similarity = wordSimilarity(token, target.word);
+      if (similarity >= RECALL_MATCH_THRESHOLD) {
+        candidates.push({ token, tokenIndex, targetIndex, similarity });
+      }
+    });
+  });
+
+  candidates.sort((a, b) => b.similarity - a.similarity);
+
+  const usedTokens = new Set();
+  const usedTargets = new Set();
+
+  candidates.forEach((match) => {
+    if (usedTokens.has(match.tokenIndex) || usedTargets.has(match.targetIndex)) return;
+
+    usedTokens.add(match.tokenIndex);
+    usedTargets.add(match.targetIndex);
+
+    targets[match.targetIndex].recalled = 1;
+    targets[match.targetIndex].recalled_as = match.token;
+    targets[match.targetIndex].match_similarity = match.similarity.toFixed(3);
+  });
+
+  state.scoredWords = targets;
+  state.intrusions = state.recallTokens.filter((token, tokenIndex) => !usedTokens.has(tokenIndex));
   state.sessionEnd = new Date().toISOString();
 }
 
@@ -352,11 +418,26 @@ function showAutoSaveScreen() {
       <p class="small muted">
         Your own three scores do not have to follow the typical pattern. Each condition contains only six words, and memory varies from person to person and from trial to trial. A small difference in one individual is therefore not strong evidence that one strategy is generally better.
       </p>
+      <p class="small muted">
+        Scoring ignores capitalization and allows minor spelling errors. A response is credited when its spelling is at least 75% similar to one of the studied words; one response can count for only one studied word.
+      </p>
     </div>
 
     <div class="notice" id="saveStatus">
       <strong>Saving...</strong> Both data files must be accepted before you continue to the final survey.
     </div>
+
+    <div class="redirect-panel" id="redirectPanel" hidden>
+      <div class="redirect-header">
+        <strong>Continuing automatically in <span id="redirectSeconds">30</span> seconds</strong>
+        <button class="secondary pause-button" id="pauseRedirectBtn" type="button">Pause timer</button>
+      </div>
+      <progress id="redirectProgress" max="30" value="30" aria-label="Time remaining before continuing"></progress>
+      <p class="muted small" id="redirectNote">
+        You may pause the timer if you need more time to review your results and the explanation above.
+      </p>
+    </div>
+
     <div id="backupControls" hidden>
       <p class="muted small">If automatic saving fails, download both files as a backup or try saving again.</p>
       <button id="retrySaveBtn">Try saving again</button>
@@ -443,6 +524,43 @@ function downloadTrialCsv() {
   downloadCsv(`encoding_trials_${state.sessionId}.csv`, getTrialRows());
 }
 
+function startRedirectCountdown(destinationUrl) {
+  const panel = document.getElementById("redirectPanel");
+  const secondsText = document.getElementById("redirectSeconds");
+  const progress = document.getElementById("redirectProgress");
+  const pauseButton = document.getElementById("pauseRedirectBtn");
+  const note = document.getElementById("redirectNote");
+
+  let secondsLeft = RESULTS_REVIEW_SECONDS;
+  let paused = false;
+
+  panel.hidden = false;
+  secondsText.textContent = secondsLeft;
+  progress.max = RESULTS_REVIEW_SECONDS;
+  progress.value = secondsLeft;
+
+  const interval = window.setInterval(() => {
+    if (paused) return;
+
+    secondsLeft -= 1;
+    secondsText.textContent = Math.max(0, secondsLeft);
+    progress.value = Math.max(0, secondsLeft);
+
+    if (secondsLeft <= 0) {
+      window.clearInterval(interval);
+      window.location.assign(destinationUrl);
+    }
+  }, 1000);
+
+  pauseButton.addEventListener("click", () => {
+    paused = !paused;
+    pauseButton.textContent = paused ? "Resume timer" : "Pause timer";
+    note.textContent = paused
+      ? "Timer paused. Your results remain on screen until you resume it."
+      : "You may pause the timer if you need more time to review your results and the explanation above.";
+  });
+}
+
 async function sendTextFileToDataPipe(filename, dataString) {
   const experimentID = PROJECT_CONFIG.DATAPIPE_EXPERIMENT_ID.trim();
   if (!experimentID || experimentID.includes("PASTE_")) {
@@ -504,14 +622,14 @@ async function saveDataAndContinue() {
       state.uploadStatus.trials = true;
     }
 
-    statusBox.innerHTML = `<strong class="good">Saved.</strong> Both data files were accepted. Please review your results and the explanation above. You will continue automatically in ${Math.round(RESULTS_REVIEW_MS / 1000)} seconds.`;
+    statusBox.innerHTML = `<strong class="good">Saved.</strong> Both data files were accepted. Please review your results and the explanation above.`;
     const destination = PROJECT_CONFIG.REDIRECT_URL.trim();
     if (!destination || destination.includes("PASTE_")) throw new Error("Redirect URL has not been configured in config.js.");
 
     const nextUrl = new URL(destination, window.location.href);
     if (PROJECT_CONFIG.PASS_SESSION_ID) nextUrl.searchParams.set("sid", state.sessionId);
 
-    window.setTimeout(() => window.location.assign(nextUrl.toString()), RESULTS_REVIEW_MS);
+    startRedirectCountdown(nextUrl.toString());
   } catch (error) {
     console.error(error);
     statusBox.innerHTML = `<strong class="warn">The data were not fully saved.</strong><br />${escapeHtml(error.message)}<br />Keep this page open and try again. Backup download buttons are available below.`;

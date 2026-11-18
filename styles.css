@@ -207,3 +207,41 @@ code {
 .expected-pattern {
   font-size: 1.02rem;
 }
+
+
+.redirect-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin: 18px 0;
+  background: #fafbfc;
+}
+
+.redirect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pause-button {
+  margin: 0;
+}
+
+.redirect-panel progress {
+  width: 100%;
+  height: 18px;
+  margin-top: 14px;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 600px) {
+  .redirect-header {
+    align-items: stretch;
+  }
+
+  .pause-button {
+    width: 100%;
+  }
+}
