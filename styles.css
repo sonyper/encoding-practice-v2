@@ -192,3 +192,18 @@ code {
     margin-right: 0;
   }
 }
+
+
+.interpretation-box h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.interpretation-box p {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.expected-pattern {
+  font-size: 1.02rem;
+}

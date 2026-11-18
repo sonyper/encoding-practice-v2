@@ -40,6 +40,7 @@ const WORD_DURATION_MS = 500;
 const POST_BLOCK_COUNTDOWN_SECONDS = 5;
 const DISTRACTOR_SECONDS = 5;
 const DISTRACTOR_STEP = 3;
+const RESULTS_REVIEW_MS = 25000;
 
 const state = {
   sessionId: makeSessionId(),
@@ -341,6 +342,18 @@ function showAutoSaveScreen() {
       <div class="stat"><span class="value">${imagery}/6</span>Mental imagery</div>
       <div class="stat"><span class="value">${total}/18</span>Total recalled</div>
     </div>
+
+    <div class="result-box interpretation-box">
+      <h3>What pattern do researchers usually expect?</h3>
+      <p class="expected-pattern"><strong>Typical group pattern:</strong> self-reference and mental imagery usually produce better later recall than simple maintenance rehearsal. The exact ordering of self-reference and imagery can vary.</p>
+      <p>
+        The main idea is <strong>elaborative encoding</strong>. Simply repeating a word can keep it active for a short time, but it adds relatively little meaning. By contrast, self-reference connects a word with information you already know well about yourself, while mental imagery links the word to a vivid visual representation. Those richer connections provide more useful cues when you later try to remember the word.
+      </p>
+      <p class="small muted">
+        Your own three scores do not have to follow the typical pattern. Each condition contains only six words, and memory varies from person to person and from trial to trial. A small difference in one individual is therefore not strong evidence that one strategy is generally better.
+      </p>
+    </div>
+
     <div class="notice" id="saveStatus">
       <strong>Saving...</strong> Both data files must be accepted before you continue to the final survey.
     </div>
@@ -491,14 +504,14 @@ async function saveDataAndContinue() {
       state.uploadStatus.trials = true;
     }
 
-    statusBox.innerHTML = "<strong class=\"good\">Saved.</strong> Both data files were accepted. Opening the final survey...";
+    statusBox.innerHTML = `<strong class="good">Saved.</strong> Both data files were accepted. Please review your results and the explanation above. You will continue automatically in ${Math.round(RESULTS_REVIEW_MS / 1000)} seconds.`;
     const destination = PROJECT_CONFIG.REDIRECT_URL.trim();
     if (!destination || destination.includes("PASTE_")) throw new Error("Redirect URL has not been configured in config.js.");
 
     const nextUrl = new URL(destination, window.location.href);
     if (PROJECT_CONFIG.PASS_SESSION_ID) nextUrl.searchParams.set("sid", state.sessionId);
 
-    window.setTimeout(() => window.location.assign(nextUrl.toString()), 600);
+    window.setTimeout(() => window.location.assign(nextUrl.toString()), RESULTS_REVIEW_MS);
   } catch (error) {
     console.error(error);
     statusBox.innerHTML = `<strong class="warn">The data were not fully saved.</strong><br />${escapeHtml(error.message)}<br />Keep this page open and try again. Backup download buttons are available below.`;

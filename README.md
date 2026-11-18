@@ -56,3 +56,10 @@ When the participant finishes free recall, the app automatically sends two uniqu
 The app waits until DataPipe returns an accepted status for both files before automatically redirecting to the configured Qualtrics survey. If an upload is rejected or the network request fails, the participant remains on the page and can retry or download the CSV files locally.
 
 If `PASS_SESSION_ID` is true, the redirect URL receives the anonymous session ID as a query parameter named `sid`. Example: `https://nextsite.example/?sid=ABCD1234`.
+
+
+## Participant results explanation
+
+The results screen now displays the participant's recall score for each encoding strategy together with a concise explanation of the typical group-level pattern: elaborative encoding through self-reference or mental imagery generally produces better later recall than maintenance rehearsal, while the relative ordering of self-reference and imagery can vary. The explanation also cautions participants not to overinterpret a single six-word-per-condition result.
+
+The DataPipe upload behavior is unchanged. After both files are accepted, the results/explanation screen remains visible for 25 seconds and then automatically redirects using the existing configuration.
